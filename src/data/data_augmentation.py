@@ -1,13 +1,10 @@
+import argparse
 import cv2
 import os
 import numpy as np
 import albumentations as A
 from torchvision.transforms import ColorJitter
 from PIL import Image
-
-# define paths
-original_dir = r"C:\Users\taibeche ahmed\Downloads\Compressed\conv"
-augmented_dir = r"C:\Users\taibeche ahmed\Downloads\Compressed\aug_no cap"
 
 # define augmentation functions
 def luminosity(image):
@@ -128,26 +125,30 @@ def zoom(image):
     return zoomed
 
 
-
-
-
 # define list of augmentation functions
-augmentations = [rotate, stretch, luminosity, color_filter, blur,noise,zoom]
-
-# create directory for augmented images
-os.makedirs(augmented_dir, exist_ok=True)
+augmentations = [rotate, stretch, luminosity, color_filter, blur, noise, zoom]
 
 # create list of valid file extensions
 valid_extensions = ['.jpg', '.jpeg', '.png']
 
-# generate augmented images
-for filename in os.listdir(original_dir):
-    # check if the file has a valid extension
-    if os.path.splitext(filename)[1] in valid_extensions:
-        # load image
-        img = cv2.imread(os.path.join(original_dir, filename))
 
-        # generate and save augmented images
-        for i, func in enumerate(augmentations):
-            augmented_img = func(img.copy())
-            cv2.imwrite(os.path.join(augmented_dir, f"{os.path.splitext(filename)[0]}_aug_{i}.jpeg"), augmented_img)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Generate augmented copies of every image in a folder')
+    parser.add_argument('input_dir', help='folder containing the original images')
+    parser.add_argument('output_dir', help='folder to write the augmented images to')
+    args = parser.parse_args()
+
+    # create directory for augmented images
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # generate augmented images
+    for filename in os.listdir(args.input_dir):
+        # check if the file has a valid extension
+        if os.path.splitext(filename)[1].lower() in valid_extensions:
+            # load image
+            img = cv2.imread(os.path.join(args.input_dir, filename))
+
+            # generate and save augmented images
+            for i, func in enumerate(augmentations):
+                augmented_img = func(img.copy())
+                cv2.imwrite(os.path.join(args.output_dir, f"{os.path.splitext(filename)[0]}_aug_{i}.jpeg"), augmented_img)

@@ -1,115 +1,76 @@
-import torch
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
-import cv2
+#!/usr/bin/env python3
+# real-time water bottle inspection from a camera feed with an exported ONNX model
+import argparse
 import os
-import torch
-from torchvision import models, transforms
-import onnx
+import cv2
 import onnxruntime
 import torchvision.transforms as transforms
-import cv2
-import matplotlib.pyplot as plt
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="True"
 
-# Load the ONNX model
-model = onnx.load(r"C:\Users\taibeche ahmed\Desktop\project\pytorch-classification-master\models\incept_lr_0.001_same_wddrop_d2\inceptdata1_ep80")
+# parse command line
+parser = argparse.ArgumentParser(description='Classify water bottles from a camera feed in real time')
+parser.add_argument('model', help='path to the ONNX model')
+parser.add_argument('--camera', default=0, type=int, help='camera index for cv2.VideoCapture (default: 0)')
+parser.add_argument('--resolution', default=299, type=int, help='input NxN resolution of the model (default: 299 for Inception)')
+parser.add_argument('--classes', default='Defective,Propre', help='comma-separated class names in model output order (default: Defective,Propre)')
+args = parser.parse_args()
 
-# Create a PyTorch model from the ONNX model
-options = onnxruntime.SessionOptions()
-options.intra_op_num_threads = 1
-options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
-options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-#providers = ['CUDAExecutionProvider']
-#pytorch_model = onnxruntime.InferenceSession(r"C:\Users\taibeche ahmed\Desktop\project\pytorch-classification-master\models\res50\res50largedata", options, providers)
-# Set available providers
-providers = ['TensorrtExecutionProvider', 'CUDAExecutionProvider']
+# Use TensorRT / CUDA when available (Jetson Nano), fall back to the CPU otherwise
+providers = [p for p in ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+             if p in onnxruntime.get_available_providers()]
+session = onnxruntime.InferenceSession(args.model, providers=providers)
+print(f"=> running on {session.get_providers()}")
 
-# Create InferenceSession object with specified providers
-# Create InferenceSession object with specified providers
-
-pytorch_model = onnxruntime.InferenceSession(r"C:\Users\taibeche ahmed\Desktop\project\pytorch-classification-master\models\incept_lr_0.001_same_wddrop_d2\inceptdata1_ep80",
-                                             providers=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider'])
-
-
-input_name = pytorch_model.get_inputs()[0].name
-output_name = pytorch_model.get_outputs()[0].name
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
 
 # Define the image preprocessing transforms
 preprocess = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize(299),
-    transforms.CenterCrop(299),
+    transforms.Resize(args.resolution),
+    transforms.CenterCrop(args.resolution),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 # Define the list of class names
-class_names = ['Defective', 'Propre']
+class_names = args.classes.split(',')
 
-# Choose the input source
-#input_source = input("Choose the input source ('webcam' or 'folder'): ")
-input_source='webcam'
-if input_source == 'webcam':
-    # Initialize the default camera
-    cap = cv2.VideoCapture(0)
+# Initialize the camera
+cap = cv2.VideoCapture(args.camera)
 
-    while True:
-        # Capture frame-by-frame
-        ret, frame = cap.read()
-        # Convert the frame to RGB format
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # Convert the frame to tensor
+while True:
+    # Capture frame-by-frame
+    ret, frame = cap.read()
+    if not ret:
+        print("=> could not read from the camera")
+        break
 
-        frame_tensor = preprocess(frame_rgb).unsqueeze(0)
-        # Move tensor to GPU device
+    # Convert the frame to RGB format and to a tensor
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_tensor = preprocess(frame_rgb).unsqueeze(0)
 
-        frame_tensor = frame_tensor.to('cuda')
-        # Perform inference
+    # Perform inference
+    output = session.run([], {input_name: frame_tensor.numpy()})[0]
 
-        with torch.no_grad():
-            output = pytorch_model.run([], {input_name: frame_tensor.cpu().numpy()})[0]
-        '''
-        # Convert the frame to RGB format
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # Get the predicted class and confidence
+    pred_idx = output.argmax()
+    pred_class = class_names[pred_idx]
+    confidence = max(output[0])
 
-       # Convert the frame to tensor and preprocess
-        with torch.no_grad():
-            frame_tensor = preprocess(frame_rgb).unsqueeze(0)
+    # Print the results to console
+    print(f"class={pred_class}, confidence={confidence:.2f}")
 
-            # Perform inference
-            output = pytorch_model.run([], {input_name: frame_tensor.numpy()})[0]
-        '''
+    # Display the frame with the predicted class and confidence printed on it
+    cv2.putText(frame, f"{pred_class} ({confidence:.2f})", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    cv2.imshow('Water bottle inspection', frame)
 
+    # Press q to quit
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-
-
-
-
-
-
-
-        # Get the predicted class and accuracy
-        pred_idx = output.argmax()
-        pred_class = class_names[pred_idx]
-        accuracy = max(output[0])
-
-        # Print the results to console
-        print(f"class={pred_class}, accuracy={accuracy:.2f}")
-
-        # Display the frame with predicted class and accuracy printed on it
-        plt.imshow(frame_rgb)
-        plt.text(10, 10, f"{pred_class} ({accuracy:.2f})", color='white')
-        plt.show(block=False)
-        plt.pause(0.001)
-        plt.clf()
-
-        # Check for quit command
-        if cv2.waitKey(1) == ord('q'):
-            break
-
-    # When everything done, release the capture
-    cap.release()
-    cv2.destroyAllWindows()
-
+# When everything done, release the capture
+cap.release()
+cv2.destroyAllWindows()

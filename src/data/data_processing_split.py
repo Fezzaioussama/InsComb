@@ -1,20 +1,31 @@
+import argparse
 import os
 import cv2
 import numpy as np
 import random
 
+# parse command-line arguments
+parser = argparse.ArgumentParser(description='Resize the images of one class and split them into train/val/test')
+parser.add_argument('input_dir', help='folder containing the (augmented) images of one class')
+parser.add_argument('output_dir', help='dataset root, images are written to <output_dir>/{train,val,test}/<class-name>')
+parser.add_argument('--class-name', required=True, help='class folder name, e.g. Propre or Defective')
+parser.add_argument('--size', default=224, type=int, help='target NxN image size (default: 224, use 299 for Inception)')
+parser.add_argument('--train-ratio', default=0.75, type=float, help='fraction of images used for training (default: 0.75)')
+parser.add_argument('--val-ratio', default=0.15, type=float, help='fraction of images used for validation (default: 0.15)')
+args = parser.parse_args()
+
 # Set the directory paths
-dir_path = r'E:\DATA\My Data\aug PROPRE'  # Adjust as needed
-train_path = r'E:\DATA\mido\Train\Propre'  # Adjust as needed
-valid_path = r'E:\DATA\mido\Val\Propre'  # Adjust as needed
-test_path = r'E:\DATA\mido\Test\Propre'  # Adjust as needed
+dir_path = args.input_dir
+train_path = os.path.join(args.output_dir, 'train', args.class_name)
+valid_path = os.path.join(args.output_dir, 'val', args.class_name)
+test_path = os.path.join(args.output_dir, 'test', args.class_name)
 
 # Set the target size for resizing the images
-target_size = (224, 224)
+target_size = (args.size, args.size)
 
 # Set the ratios for splitting the data
-train_ratio = 0.75
-valid_ratio = 0.15
+train_ratio = args.train_ratio
+valid_ratio = args.val_ratio
 
 # Create empty lists to hold the image filenames and labels
 image_filenames = []
@@ -22,9 +33,9 @@ labels = []
 
 # Loop through the images in the directory
 for filename in os.listdir(dir_path):
-    if filename.endswith(('.jpg', '.jpeg', '.png')):
+    if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
         image_filenames.append(os.path.join(dir_path, filename))
-        labels.append("propre")
+        labels.append(args.class_name.lower())
 
 # Shuffle the image filenames and labels together
 combined = list(zip(image_filenames, labels))
@@ -56,3 +67,5 @@ for i, (filename, label) in enumerate(zip(image_filenames, labels)):
 
     if i % 100 == 0:
         print(f'{i} images processed...')
+
+print(f'done: {num_train} train, {num_valid} val, {num_test} test images')
