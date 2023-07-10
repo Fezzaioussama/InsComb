@@ -26,7 +26,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 from torch.utils.tensorboard import SummaryWriter
 
-from reshape import reshape_model
+from src.training.reshape import reshape_model
 
 # get the available network architectures
 model_names = sorted(name for name in models.__dict__

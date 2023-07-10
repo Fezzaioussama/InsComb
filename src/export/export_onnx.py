@@ -6,7 +6,7 @@ import argparse
 import torch
 import torchvision.models as models
 
-from reshape import reshape_model
+from src.training.reshape import reshape_model
 
 
 model_names = sorted(name for name in models.__dict__
