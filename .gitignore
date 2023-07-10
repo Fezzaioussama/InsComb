@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Datasets and trained models (too large for git, see README)
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+*.pth
+*.pth.tar
+*.onnx
+
+# Training logs
+tensorboard/
+
+# OS / editor files
+*:Zone.Identifier
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
