@@ -1,13 +1,11 @@
 torch
 torchvision
-argparse
-os
-random
-time
-shutil
-warnings
-datetime
-cv2
+tensorboard
 numpy
-albumentations
+opencv-python
 Pillow
+# ElasticTransform(alpha_affine=...) used in data_augmentation.py was removed in later versions
+albumentations<1.4
+onnx
+# on the Jetson Nano install the onnxruntime-gpu wheel from NVIDIA's Jetson Zoo instead
+onnxruntime
