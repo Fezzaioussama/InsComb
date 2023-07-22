@@ -1,12 +1,69 @@
-# Water Bottle Visual Inspection System
+<p align="center">
+  <img src="assets/inspection-mark.png" width="128" height="128" alt="InsComb — a water bottle passing through an industrial vision scanner">
+</p>
 
-Visual inspection of water bottles with deep learning (transfer learning), trained with PyTorch and deployed on an NVIDIA Jetson Nano through ONNX.
+<h1 align="center">InsComb</h1>
+
+<p align="center"><strong>Dual-camera edge AI for water-bottle quality control.</strong></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/training-PyTorch-EE4C2C" alt="Training: PyTorch">
+  <img src="https://img.shields.io/badge/deployment-ONNX_Runtime-005CED" alt="Deployment: ONNX Runtime">
+  <img src="https://img.shields.io/badge/edge-NVIDIA_Jetson_Nano-2E7D32" alt="Edge platform: NVIDIA Jetson Nano">
+  <img src="https://img.shields.io/badge/test_accuracy-94.5%25-0f766e" alt="InsComb test accuracy: 94.5 percent">
+</p>
+
+<p align="center">
+  <a href="#system-at-a-glance">Overview</a> ·
+  <a href="#results">Results</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="report/PFE_report.pdf">Full report</a>
+</p>
+
+InsComb is a computer-vision inspection system for bottled-water production.
+Two InceptionV3 classifiers inspect complementary camera views—the complete
+bottle and its cap area—and accept a bottle only when both models classify it
+as clean. Training uses PyTorch; deployment uses ONNX Runtime with TensorRT or
+CUDA acceleration on an NVIDIA Jetson Nano.
 
 **Authors:** Ahmed Taibeche & Oussama Chams Eddine Fezzai
 
-Final-year engineering project (*Mémoire de fin d'études*, Diplôme d'Ingénieur d'État in Automatic Control and Industrial Computing), École Nationale Supérieure de Technologie, Algiers, supervised by Mme Karima Rebai and defended on 4 July 2023 (academic year 2022–2023).
+This final-year engineering project (*Mémoire de fin d'études*, Diplôme
+d'Ingénieur d'État in Automatic Control and Industrial Computing) was completed
+at École Nationale Supérieure de Technologie, Algiers, supervised by Mme Karima
+Rebai and defended on 4 July 2023 (academic year 2022–2023).
 
-The full report is in [`report/PFE_report.pdf`](report/PFE_report.pdf) (in French: chapter 3 covers the models, chapter 4 the prototype; a browser's PDF translator works well to read it in English).
+The [full project report](report/PFE_report.pdf) is in French. Chapter 3 covers
+the models and results; chapter 4 covers the industrial prototype.
+
+> **Note:** this repository is not the complete project. It only contains the open-source part: the data preparation, GAN augmentation, training, export, evaluation and inference code. The following parts are not included:
+> - the final weights of the trained models (InsBot and InsPart)
+> - the dataset
+> - the web dashboard (the Node-RED supervision page with the inspection statistics)
+> - the Jetson Nano part (the application deployed on the prototype and its communication with the PLC)
+> - the production version of the inspection system (with the PLC and HMI of the inspection line, described in chapter 4 of the report)
+
+## System at a glance
+
+| Final configuration | Test accuracy | Edge throughput | Deployment |
+|---|---:|---:|---|
+| InsBot + InsPart | **94.5%** on 1,600 images | **9 FPS** with both models | Jetson Nano · ONNX Runtime · TensorRT/CUDA |
+
+```mermaid
+flowchart LR
+    Bottle[Water bottle] --> Whole[Camera 1 · whole bottle]
+    Bottle --> Cap[Camera 2 · cap area]
+    Whole --> InsBot[InsBot]
+    Cap --> InsPart[InsPart]
+    InsBot --> Gate{Both clean?}
+    InsPart --> Gate
+    Gate -->|Yes| Accept[Accept]
+    Gate -->|No| Reject[Reject]
+```
+
+The two-view design targets the cap defects that the whole-bottle model found
+hardest. It keeps the decision conservative: one defective prediction is enough
+to reject the bottle.
 
 ## Introduction
 In today's manufacturing industry, ensuring product safety is paramount, particularly in the production of bottled water. Visual inspection plays a crucial role in maintaining quality standards and safeguarding consumer health. This project focuses on the development of a robust system for visual inspection in water bottle production, leveraging deep learning techniques.
@@ -43,6 +100,7 @@ Real-time performance in frames per second (chapter 4):
 - **Target Platform**: Edge application, specifically designed for deployment on the Jetson Nano developer kit for inference.
 - **Data Collection and Augmentation**: We built our own dataset (2400 photos per class, with cap, fill level, foreign object and deformation defects) and augmented it with a custom script (`data_augmentation.py`): rotation, stretching, contrast, luminosity, color filtering, elastic blur, cutout, noise and zoom.
 - **Data Preprocessing**: The images are resized and split into train / validation / test sets (`data_processing_split.py`), keeping all the augmented versions of a photo in the same set so that the validation and test sets only contain unseen bottles. Normalization is applied by the training transforms.
+- **GAN Augmentation**: A DCGAN (`src/gan/`) can be trained on the training photos of each class to generate new synthetic bottle images for the training set. Spectral normalization, a minibatch standard deviation layer and differentiable augmentation (DiffAugment) help it train stably and produce varied images from a few thousand photos.
 - **Model Training**: We fine-tuned the selected pre-trained architectures on our dataset with a custom script (`train.py`), comparing the Adam and SGD optimizers, learning rates, weight decay and dropout.
 - **Model Export**: After training, we exported the trained models to the ONNX format (`export_onnx.py`). This format offers compatibility and efficiency for deployment on edge devices like the Jetson Nano, facilitating seamless integration into production environments.
 - **Inference**: A dedicated script (`inference.py`) runs one model, or the two InsComb models, on live camera feeds in real time, allowing rapid and accurate identification of defective water bottles during production.
@@ -50,8 +108,6 @@ Real-time performance in frames per second (chapter 4):
 ## Project Structure
 ```
 .
-├── data/                       # dataset (not tracked, see below)
-├── models/                     # trained checkpoints and ONNX models (not tracked)
 ├── report/
 │   └── PFE_report.pdf          # final project report (French)
 ├── src/
@@ -61,6 +117,11 @@ Real-time performance in frames per second (chapter 4):
 │   ├── training/
 │   │   ├── train.py                 # transfer-learning training loop
 │   │   └── reshape.py               # create a model and replace its classifier head
+│   ├── gan/
+│   │   ├── dcgan.py                 # DCGAN generator and discriminator
+│   │   ├── diffaugment.py           # differentiable augmentation for small datasets
+│   │   ├── train_gan.py             # train a GAN on the training photos of one class
+│   │   └── generate.py              # generate synthetic training images
 │   ├── export/
 │   │   ├── export_onnx.py           # PyTorch checkpoint -> ONNX
 │   │   └── evaluate_onnx.py         # accuracy, precision/recall/F1 and confusion matrix on a test set
@@ -81,7 +142,7 @@ pip install -r requirements.txt
 On the Jetson Nano, evaluation and inference only need `numpy`, `Pillow`, `opencv-python` and the `onnxruntime-gpu` wheel from NVIDIA's Jetson Zoo: PyTorch is only used for training and export.
 
 ### Dataset and models
-The dataset (~1 GB) and the trained model (~425 MB) are too large for this repository, so `data/` and `models/` are kept empty. The scripts expect one folder per class:
+The dataset and the trained models are confidential and are not included in this repository (`raw/`, `augmented/`, `data/` and `models/` are ignored by git). To use the scripts with your own photos, they expect one folder per class:
 ```
 raw/                  augmented/            data/bottles/
 ├── Defective/   ->   ├── Defective/   ->   ├── train/{Defective,Propre}/
@@ -103,21 +164,27 @@ All scripts are run as modules from the repository root, `--help` lists all thei
    python -m src.data.data_processing_split augmented/Propre data/bottles --class-name Propre --size 299
    python -m src.data.data_processing_split augmented/Defective data/bottles --class-name Defective --size 299
    ```
-3. **Train** (Inception models use 299x299 images, the others 224x224):
+3. **Generate synthetic images with a GAN** (optional): train a DCGAN on the training photos of each class, then add generated images to its training folder:
+   ```bash
+   python -m src.gan.train_gan data/bottles/train/Propre --model-dir models/gan/Propre
+   python -m src.gan.generate models/gan/Propre/gan_checkpoint.pth.tar data/bottles/train/Propre --count 1000 --size 299
+   ```
+   Same for `Defective`. Check the samples saved in `models/gan/<class>/samples/` before using the generated images, especially for `Defective`: small defects (e.g. a small foreign object) can disappear at 64x64, which would add mislabeled images. The GAN only learns from the original photos of the training split (augmented copies are skipped unless `--include-augmented`), and its images must never go to `val/` or `test/`: these sets must stay real, unseen photos. `--image-size 128` gives more detail but needs a GPU and more epochs.
+4. **Train** (Inception models use 299x299 images, the others 224x224):
    ```bash
    python -m src.training.train data/bottles --arch inception_v3 --model-dir models/inception_v3
    tensorboard --logdir models/inception_v3/tensorboard
    ```
    Other options: `--optimizer sgd`, `--lr`, `--epochs`, `--dropout 0.5`, `--freeze-backbone` (only train the new classification layers) and lighter architectures for the Jetson Nano such as `--arch mobilenet_v3_large` or `efficientnet_b0`.
-4. **Export** the best checkpoint to ONNX (single-file model with opset 13 for TensorRT 8 on the Jetson Nano, checked against PyTorch):
+5. **Export** the best checkpoint to ONNX (single-file model with opset 13 for TensorRT 8 on the Jetson Nano, checked against PyTorch):
    ```bash
    python -m src.export.export_onnx --model-dir models/inception_v3
    ```
-5. **Evaluate** the ONNX model on the test set:
+6. **Evaluate** the ONNX model on the test set:
    ```bash
    python -m src.export.evaluate_onnx models/inception_v3/inception_v3.onnx data/bottles/test --show-errors
    ```
-6. **Run** real-time inference from a camera (press `q` to quit):
+7. **Run** real-time inference from a camera (press `q` to quit):
    ```bash
    python -m src.inference.inference models/inception_v3/inception_v3.onnx --source 0
    ```
@@ -132,6 +199,12 @@ All scripts are run as modules from the repository root, `--help` lists all thei
 
 ## Conclusion
 Our project presents a comprehensive solution for visual inspection in water bottle production, leveraging the power of deep learning and edge computing. By integrating advanced techniques and leveraging pre-trained models, we have demonstrated significant improvements in accuracy and efficiency. We believe that our system holds great potential for improving quality control processes within the manufacturing industry, thereby enhancing product safety and consumer satisfaction.
+
+## Brand assets
+
+- [SVG icon](assets/inspection-mark.svg) — editable, accessible vector source.
+- [Transparent PNG](assets/inspection-mark.png) — 512 × 512 pixels for
+  presentations, profiles and repository artwork.
 
 ## Acknowledgements
 - Our supervisor Mme Karima Rebai and the jury members of ENST Algiers.

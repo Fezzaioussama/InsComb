@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">InsComb visual inspection mark</title>
+  <desc id="desc">A water bottle passing through a cyan industrial vision scanner with a green approval check.</desc>
+  <defs>
+    <linearGradient id="scan" x1="34" y1="32" x2="128" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="#0b132b"/>
+  <g fill="none" stroke="url(#scan)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 52V32h20M110 32h20v20M30 108v20h20M110 128h20v-20" stroke-width="6"/>
+    <path d="M70 24h20v15l10 13v67c0 10-8 17-18 17h-4c-10 0-18-7-18-17V52l10-13Z" stroke-width="6"/>
+    <path d="M69 36h22M60 78h40" stroke-width="4" opacity=".9"/>
+  </g>
+  <path d="M24 79h112" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+  <path d="m69 108 9 9 17-21" fill="none" stroke="#34d399" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
