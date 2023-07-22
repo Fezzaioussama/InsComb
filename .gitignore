@@ -5,14 +5,16 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 
-# Datasets and trained models (too large for git, see README)
-data/*
-!data/.gitkeep
-models/*
-!models/.gitkeep
+# Datasets and trained models are confidential: never commit them
+raw/
+augmented/
+data/
+models/
 *.pth
 *.pth.tar
 *.onnx
+*.onnx.data
+*.zip
 
 # Training logs
 tensorboard/
